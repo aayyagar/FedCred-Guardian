@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FedCred Guardian Report</title>
+<meta name="description" content="FedCred Guardian: read-only audit of GitHub Actions OIDC trust across Entra ID, Azure managed identities and AWS IAM.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single audit sheet. Verdict first (score, readiness, actions), then every credential
+   as an expandable row with its findings and migration runbook, then the check reference. */
+:root{
+  --bg:#F4F6FA; --surface:#FFFFFF; --ink:#151A2C; --muted:#5B6278; --line:#DCE2EC;
+  --accent:#0A66C8; --accent-soft:#E3EFFC;
+  --crit:#C2362B; --high:#D9731A; --med:#B08A12; --low:#3F7CB8; --pass:#1E8A5A;
+  --code-bg:#0D1526; --code-ink:#D6DEEE;
+  --display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1322; --surface:#161C2E; --ink:#E9EDF5; --muted:#9AA3BA; --line:#283149;
+  --accent:#4C9BFF; --accent-soft:#132A47;
+  --crit:#FF6B5E; --high:#FF9B47; --med:#E3C04F; --low:#7FB2E5; --pass:#4CC38A;
+  --code-bg:#080C17; --code-ink:#D6DEEE; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1322; --surface:#161C2E; --ink:#E9EDF5; --muted:#9AA3BA; --line:#283149;
+  --accent:#4C9BFF; --accent-soft:#132A47;
+  --crit:#FF6B5E; --high:#FF9B47; --med:#E3C04F; --low:#7FB2E5; --pass:#4CC38A;
+  --code-bg:#080C17; --code-ink:#D6DEEE; color-scheme:dark}
+
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--body)}
+.wrap{max-width:1120px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.mono{font-family:var(--mono)}
+.label{font:500 .7rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+
+header.top{padding-block:28px 8px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px;font:600 .85rem var(--mono);color:var(--muted)}
+.brand svg{width:28px;height:28px;color:var(--accent)}
+h1{font-family:var(--display);font-weight:800;font-size:clamp(1.9rem,4.4vw,2.9rem);line-height:1.02;letter-spacing:-.025em;margin:10px 0 6px;text-wrap:balance}
+.meta-line{color:var(--muted);font-size:.92rem;display:flex;gap:8px 16px;flex-wrap:wrap}
+.badge{display:inline-flex;align-items:center;gap:6px;font:500 .7rem var(--mono);letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--line);border-radius:999px;padding:3px 10px;color:var(--muted);background:var(--surface)}
+.badge.demo{border-color:var(--accent);color:var(--accent)}
+.ro{display:inline-flex;gap:6px;align-items:center}
+.ro i{width:8px;height:8px;border-radius:50%;background:var(--pass)}
+
+/* verdict */
+.verdict{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:18px;margin-top:22px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;min-width:0}
+.scorebox{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.ring{position:relative;width:150px;height:150px}
+.ring svg{width:150px;height:150px;transform:rotate(-90deg)}
+.ring .num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring b{font:800 2.6rem/1 var(--display);font-variant-numeric:tabular-nums}
+.ring span{font:500 .72rem var(--mono);color:var(--muted)}
+.grade{font:800 1rem var(--display);padding:2px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.right{display:grid;gap:18px;min-width:0}
+.sev{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.sev button{all:unset;cursor:pointer;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--surface);display:flex;flex-direction:column;gap:2px;min-width:0}
+.sev button:hover{border-color:var(--accent)}
+.sev button[aria-pressed="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.sev b{font:800 1.9rem/1 var(--display);font-variant-numeric:tabular-nums}
+.sev .Critical b{color:var(--crit)}.sev .High b{color:var(--high)}.sev .Medium b{color:var(--med)}.sev .Low b{color:var(--low)}
+.ready{display:grid;gap:10px}
+.ready-top{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.ready-top strong{font:800 1.25rem var(--display)}
+.stack{display:flex;height:12px;border-radius:999px;overflow:hidden;background:var(--line)}
+.stack span{display:block;height:100%}
+.legend{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.84rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.act{font:500 .78rem var(--mono);border-radius:8px;padding:6px 10px;border:1px solid var(--line);background:var(--bg)}
+.act b{font-weight:600;color:var(--ink)}
+
+/* toolbar */
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:34px 0 14px}
+.toolbar h2{font:800 1.5rem var(--display);letter-spacing:-.01em;margin:0 auto 0 0}
+.toolbar select,.toolbar input{font:500 .85rem var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0}
+.toolbar input{width:min(260px,100%)}
+.count{font:500 .78rem var(--mono);color:var(--muted)}
+
+/* credential rows */
+.list{display:grid;gap:10px}
+details.cred{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;border-left:5px solid var(--line)}
+details.cred[data-worst="Critical"]{border-left-color:var(--crit)}
+details.cred[data-worst="High"]{border-left-color:var(--high)}
+details.cred[data-worst="Medium"]{border-left-color:var(--med)}
+details.cred[data-worst="Low"]{border-left-color:var(--low)}
+details.cred[data-worst="Pass"]{border-left-color:var(--pass)}
+summary{list-style:none;cursor:pointer;padding:14px 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center}
+summary::-webkit-details-marker{display:none}
+.s-main{min-width:0;display:grid;gap:4px}
+.s-line{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.s-line strong{font-weight:600;font-size:1rem}
+.plat{font:500 .68rem var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--accent-soft);color:var(--accent)}
+.subj{font:400 .82rem var(--mono);color:var(--muted);overflow-wrap:anywhere}
+.s-side{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.pill{font:600 .7rem var(--mono);letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.pill.Critical{color:var(--crit)}.pill.High{color:var(--high)}.pill.Medium{color:var(--med)}.pill.Low{color:var(--low)}.pill.Info{color:var(--muted)}.pill.Pass{color:var(--pass)}
+.st{font:600 .72rem var(--mono);padding:4px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);white-space:nowrap}
+.st.Ready{color:var(--pass)}.st.Delete{color:var(--crit)}.st.Restrict{color:var(--high)}.st.Migrate{color:var(--accent)}
+.chev{width:18px;height:18px;color:var(--muted);transition:transform .2s ease}
+details[open] .chev{transform:rotate(90deg)}
+.body{border-top:1px solid var(--line);padding:18px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:22px}
+.body h3{font:700 .95rem var(--display);margin:0 0 10px}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:6px 12px;font-size:.86rem;margin-bottom:16px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;overflow-wrap:anywhere}
+.kv dd.mono{font-size:.8rem}
+.find{display:grid;gap:10px}
+.f{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:4px}
+.f-top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.f-top code{font:500 .72rem var(--mono);color:var(--muted)}
+.f-top b{font-weight:600;font-size:.9rem}
+.f p{margin:0;font-size:.84rem;color:var(--muted)}
+.f p.d{color:var(--ink);overflow-wrap:anywhere}
+.none{color:var(--pass);font-weight:600;font-size:.9rem}
+ol.steps{margin:0;padding:0;list-style:none;display:grid;gap:12px;counter-reset:s}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px}
+ol.steps li::before{content:counter(s);width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font:600 .75rem var(--mono);display:flex;align-items:center;justify-content:center}
+ol.steps b{font-weight:600;font-size:.9rem}
+ol.steps p{margin:2px 0 0;font-size:.84rem;color:var(--muted);overflow-wrap:anywhere}
+.code{position:relative;margin-top:8px}
+.code pre{margin:0;background:var(--code-bg);color:var(--code-ink);font:400 .76rem/1.6 var(--mono);border-radius:10px;padding:36px 14px 12px;overflow-x:auto;white-space:pre}
+.copy{position:absolute;top:8px;right:8px;font:500 .68rem var(--mono);background:#1E2A44;color:#D6DEEE;border:1px solid #33446A;border-radius:6px;padding:4px 8px;cursor:pointer}
+.copy:hover{border-color:#7FB2E5}
+.newsub{font:500 .8rem var(--mono);background:var(--accent-soft);color:var(--ink);border-radius:8px;padding:8px 10px;margin:0 0 14px;overflow-wrap:anywhere}
+.empty{padding:28px;text-align:center;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:14px}
+
+/* checks */
+section.ref{margin-top:40px}
+section.ref h2{font:800 1.5rem var(--display);margin:0 0 12px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:.86rem;min-width:640px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 .7rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.id{font:500 .78rem var(--mono);white-space:nowrap}
+td.why{color:var(--muted)}
+footer{padding-block:30px 40px;color:var(--muted);font:400 .78rem var(--mono);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+@media (max-width:860px){.verdict{grid-template-columns:1fr}.body{grid-template-columns:1fr}}
+@media (max-width:560px){.sev{grid-template-columns:repeat(2,minmax(0,1fr))}summary{grid-template-columns:1fr}.s-side{justify-content:flex-start}.kv{grid-template-columns:1fr;gap:0 0}.kv dd{margin-bottom:6px}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.chev{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand">
+        <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3l11 4v8c0 7-4.7 12-11 14C9.7 27 5 22 5 15V7z"/><path d="M11 16h10M16 11v10" opacity=".35"/><circle cx="16" cy="16" r="3.2"/></svg>
+        FedCred Guardian
+      </div>
+      <h1>GitHub OIDC trust report</h1>
+      <div class="meta-line" id="meta"></div>
+    </div>
+    <span class="badge ro"><i></i>Read-only scan</span>
+  </header>
+
+  <div class="verdict">
+    <div class="card scorebox">
+      <div class="ring" id="ring"></div>
+      <span class="grade" id="grade"></span>
+      <span class="label">Average credential score</span>
+    </div>
+    <div class="right">
+      <div class="sev" id="sev"></div>
+      <div class="card ready">
+        <div class="ready-top"><strong id="readyText"></strong><span class="label">Subject formats</span></div>
+        <div class="stack" id="stack" role="img"></div>
+        <div class="legend" id="legend"></div>
+        <div class="actions" id="actions"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <h2>Credentials</h2>
+    <label class="label" for="fPlat">Platform</label>
+    <select id="fPlat"><option value="">All</option></select>
+    <label class="label" for="fStatus">Action</label>
+    <select id="fStatus"><option value="">All</option></select>
+    <input id="fText" type="search" placeholder="Search name, repo or subject" aria-label="Search credentials">
+    <span class="count" id="count"></span>
+  </div>
+  <div class="list" id="list"></div>
+
+  <section class="ref">
+    <h2>Checks</h2>
+    <div class="tbl"><table><thead><tr><th>ID</th><th>Severity</th><th>Check</th><th>Why it matters</th></tr></thead><tbody id="checks"></tbody></table></div>
+  </section>
+
+  <footer><span id="foot"></span><span>Nothing in your tenant or account was changed.</span></footer>
+</div>
+
+<script>
+const DATA = /*__FCG_DATA__*/null;
+(function(){
+  const arr = x => x == null ? [] : (Array.isArray(x) ? x : [x]);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const S = DATA.Summary, creds = arr(DATA.Credentials);
+  const sevOrder = ['Critical','High','Medium','Low'];
+  let sevFilter = '';
+
+  document.getElementById('meta').innerHTML =
+    '<span>' + esc(DATA.Scope.Label) + '</span><span>' + esc(S.Credentials) + ' credentials</span><span>Generated ' + esc(DATA.GeneratedAt) + '</span>' +
+    (DATA.Scope.Demo ? '<span class="badge demo">Demo data</span>' : '');
+  document.getElementById('foot').textContent = DATA.Tool + ' v' + DATA.Version + ' · MIT license';
+
+  // score ring
+  const r = 62, c = 2 * Math.PI * r, pct = Math.max(0, Math.min(100, S.Score));
+  const col = pct >= 80 ? 'var(--pass)' : pct >= 60 ? 'var(--med)' : 'var(--crit)';
+  document.getElementById('ring').innerHTML =
+    '<svg viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="' + r + '" fill="none" stroke="var(--line)" stroke-width="12"/>' +
+    '<circle cx="75" cy="75" r="' + r + '" fill="none" stroke="' + col + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + (c * pct / 100) + ' ' + c + '"/></svg>' +
+    '<div class="num"><b>' + pct + '</b><span>/ 100</span></div>';
+  document.getElementById('grade').textContent = 'Grade ' + S.Grade;
+
+  // severity tiles (click to filter)
+  const sevEl = document.getElementById('sev');
+  sevEl.innerHTML = sevOrder.map(s => '<button type="button" class="' + s + '" data-sev="' + s + '" aria-pressed="false"><b>' + S.Severity[s] + '</b><span class="label">' + s + '</span></button>').join('');
+  sevEl.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    sevFilter = sevFilter === b.dataset.sev ? '' : b.dataset.sev;
+    sevEl.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x.dataset.sev === sevFilter ? 'true' : 'false'));
+    render();
+  });
+
+  // formats bar
+  const F = S.Formats, tot = Math.max(1, S.Credentials);
+  const parts = [['Immutable', F.Immutable, 'var(--pass)'], ['Name-based', F.NameBased, 'var(--med)'], ['Hyphen (withdrawn)', F.Hyphen, 'var(--crit)'], ['Wildcard or missing', F.Other, 'var(--muted)']];
+  document.getElementById('readyText').textContent = S.Ready + ' of ' + S.Credentials + ' credentials ready (' + S.ReadyPct + '%)';
+  document.getElementById('stack').innerHTML = parts.filter(p => p[1]).map(p => '<span style="width:' + (100 * p[1] / tot) + '%;background:' + p[2] + '" title="' + p[0] + ': ' + p[1] + '"></span>').join('');
+  document.getElementById('stack').setAttribute('aria-label', parts.map(p => p[0] + ' ' + p[1]).join(', '));
+  document.getElementById('legend').innerHTML = parts.map(p => '<span><i style="background:' + p[2] + '"></i>' + p[0] + ' · ' + p[1] + '</span>').join('');
+  document.getElementById('actions').innerHTML =
+    '<span class="act"><b>' + S.ToMigrate + '</b> to migrate</span><span class="act"><b>' + S.ToRestrict + '</b> to restrict</span><span class="act"><b>' + S.ToDelete + '</b> to delete</span>';
+
+  // filters
+  const plats = [...new Set(creds.map(x => x.Platform))], stats = [...new Set(creds.map(x => x.Status))];
+  const fp = document.getElementById('fPlat'), fs = document.getElementById('fStatus'), ft = document.getElementById('fText');
+  plats.forEach(p => fp.insertAdjacentHTML('beforeend', '<option>' + esc(p) + '</option>'));
+  stats.forEach(p => fs.insertAdjacentHTML('beforeend', '<option>' + esc(p) + '</option>'));
+  [fp, fs].forEach(el => el.addEventListener('change', render));
+  ft.addEventListener('input', render);
+
+  const rank = {Critical:4, High:3, Medium:2, Low:1, Info:0, Pass:-1};
+  const ghText = g => {
+    if (!g) return 'Not looked up';
+    const m = {Found:'Found', Renamed:'Renamed to ' + g.FullName, RepoMissing:'Repository not found', OwnerMissing:'Owner account does not exist', Unknown:'Could not verify'};
+    let t = m[g.Status] || g.Status;
+    if (g.RepoId) t += ' · repo ID ' + g.RepoId;
+    if (g.OwnerId) t += ' · owner ID ' + g.OwnerId;
+    return t;
+  };
+  const fmtText = {Immutable:'Immutable (owner@id/repo@id)', Name:'Name-based', ImmutableHyphen:'Withdrawn hyphen format'};
+
+  function row(x){
+    const fsList = arr(x.Findings), plan = x.Plan, steps = plan ? arr(plan.Steps) : [];
+    const findings = fsList.length ? fsList.map(f =>
+      '<div class="f"><div class="f-top"><span class="pill ' + f.Severity + '">' + f.Severity + '</span><code>' + f.CheckId + '</code><b>' + esc(f.Title) + '</b></div>' +
+      '<p class="d">' + esc(f.Detail) + '</p><p>' + esc(f.Why) + '</p></div>').join('') : '<p class="none">No issues found.</p>';
+    const runbook = plan ? (
+      (plan.NewSubject ? '<p class="label" style="margin:0 0 6px">New subject</p><div class="newsub">' + esc(plan.NewSubject) + '</div>' : '') +
+      '<ol class="steps">' + steps.map(s => '<li><div><b>' + esc(s.Title) + '</b><p>' + esc(s.Text) + '</p>' +
+        (s.Command ? '<div class="code"><pre>' + esc(s.Command) + '</pre><button class="copy" type="button">Copy</button></div>' : '') + '</div></li>').join('') + '</ol>'
+    ) : '<p class="none">Nothing to change.</p>';
+    return '<details class="cred" data-worst="' + x.Worst + '">' +
+      '<summary><div class="s-main"><div class="s-line"><span class="plat">' + esc(x.Platform) + '</span><strong>' + esc(x.ResourceName) + '</strong><span class="count">' + esc(x.CredentialName) + '</span></div>' +
+      '<div class="subj">' + esc(x.Subject || '(no subject condition)') + '</div></div>' +
+      '<div class="s-side"><span class="pill ' + x.Worst + '">' + (x.Worst === 'Pass' ? 'Pass' : x.Worst) + '</span><span class="st ' + x.Status + '">' + esc(x.Status) + '</span>' +
+      '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 4l6 6-6 6"/></svg></div></summary>' +
+      '<div class="body"><div><dl class="kv">' +
+        '<dt>Resource</dt><dd>' + esc(x.ResourceName) + '</dd>' +
+        '<dt>Location</dt><dd>' + esc(x.Location) + '</dd>' +
+        '<dt>Subject format</dt><dd>' + esc(fmtText[x.Format] || (x.Kind === 'Custom' ? 'Custom template' : 'Wildcard or missing')) + '</dd>' +
+        '<dt>Match</dt><dd class="mono">' + esc(x.Operator) + (x.ClaimsExpression ? ': ' + esc(x.ClaimsExpression) : '') + '</dd>' +
+        '<dt>Audience</dt><dd class="mono">' + esc(arr(x.Audiences).join(', ') || 'none') + '</dd>' +
+        '<dt>GitHub</dt><dd>' + esc(ghText(x.GitHub)) + '</dd>' +
+        '<dt>Score</dt><dd>' + x.Score + ' / 100</dd>' +
+      '</dl><h3>Findings</h3><div class="find">' + findings + '</div></div>' +
+      '<div><h3>' + (plan ? esc(plan.Action) + ' runbook' : 'Runbook') + '</h3>' + runbook + '</div></div></details>';
+  }
+
+  function render(){
+    const p = fp.value, st = fs.value, q = ft.value.trim().toLowerCase();
+    const list = creds.filter(x =>
+      (!p || x.Platform === p) && (!st || x.Status === st) &&
+      (!sevFilter || arr(x.Findings).some(f => f.Severity === sevFilter)) &&
+      (!q || [x.ResourceName, x.CredentialName, x.Subject, x.Owner, x.Repo].join(' ').toLowerCase().includes(q))
+    ).sort((a, b) => rank[b.Worst] - rank[a.Worst] || a.Score - b.Score);
+    document.getElementById('list').innerHTML = list.length ? list.map(row).join('') : '<div class="empty">No credentials match these filters.</div>';
+    document.getElementById('count').textContent = list.length + ' of ' + creds.length;
+  }
+  render();
+
+  document.getElementById('list').addEventListener('click', e => {
+    const b = e.target.closest('.copy'); if (!b) return;
+    const pre = b.previousElementSibling, txt = pre.textContent;
+    const done = () => { b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1500); };
+    const sel = () => { const rg = document.createRange(); rg.selectNodeContents(pre); const s = getSelection(); s.removeAllRanges(); s.addRange(rg); b.textContent = 'Selected'; };
+    try { navigator.clipboard.writeText(txt).then(done, sel); } catch (_) { sel(); }
+  });
+
+  document.getElementById('checks').innerHTML = arr(DATA.Checks).map(k =>
+    '<tr><td class="id">' + k.Id + '</td><td><span class="pill ' + k.Severity + '">' + k.Severity + '</span></td><td>' + esc(k.Title) + '</td><td class="why">' + esc(k.Why) + '</td></tr>').join('');
+})();
+</script>
+</body>
+</html>

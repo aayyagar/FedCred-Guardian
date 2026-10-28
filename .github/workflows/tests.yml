@@ -1,0 +1,27 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pester:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Pester
+        shell: pwsh
+        run: Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
+      - name: Run tests
+        shell: pwsh
+        run: Invoke-Pester ./tests -CI
+      - name: Demo run
+        shell: pwsh
+        run: ./Invoke-FedCredGuardian.ps1 -Demo -OutputPath ./out-demo

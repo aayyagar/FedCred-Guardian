@@ -1,0 +1,144 @@
+{
+  "label": "Contoso (demo tenant + AWS account 111122223333)",
+  "entra": [
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0001",
+      "appId": "a1b2c3d4-0001-4000-8000-000000000001",
+      "displayName": "gh-payments-api-deploy",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0001", "name": "payments-main", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:contoso/payments-api:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"] }
+      ]
+    },
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0002",
+      "appId": "a1b2c3d4-0002-4000-8000-000000000002",
+      "displayName": "gh-web-frontend",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0002", "name": "web-production", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:contoso/web-frontend:environment:production", "audiences": ["api://AzureADTokenExchange"] },
+        { "id": "fic-0003", "name": "web-staging", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:contoso@5544123/web-frontend@821093850:environment:staging", "audiences": ["api://AzureADTokenExchange"] },
+        { "id": "fic-0004", "name": "aks-workload", "issuer": "https://oidc.prod-aks.azure.com/00000000-0000-0000-0000-000000000000/",
+          "subject": "system:serviceaccount:web:frontend", "audiences": ["api://AzureADTokenExchange"] }
+      ]
+    },
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0003",
+      "appId": "a1b2c3d4-0003-4000-8000-000000000003",
+      "displayName": "gh-legacy-reporting",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0005", "name": "reporting-main", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:contoso/reporting-old:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"] }
+      ]
+    },
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0004",
+      "appId": "a1b2c3d4-0004-4000-8000-000000000004",
+      "displayName": "gh-data-pipelines",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0006", "name": "data-repos-flexible", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": null, "audiences": ["api://AzureADTokenExchange"],
+          "claimsMatchingExpression": { "value": "claims['sub'] matches 'repo:contoso/data-*'", "languageVersion": 1 } }
+      ]
+    },
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0005",
+      "appId": "a1b2c3d4-0005-4000-8000-000000000005",
+      "displayName": "gh-vendor-sync",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0007", "name": "vendor-sync-agent", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:fabrikam-tools/sync-agent:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"] }
+      ]
+    },
+    {
+      "id": "6f1c2a10-0b6e-4c55-9a51-1a0c9e1f0006",
+      "appId": "a1b2c3d4-0006-4000-8000-000000000006",
+      "displayName": "gh-infra-terraform",
+      "federatedIdentityCredentials": [
+        { "id": "fic-0008", "name": "infra-prod", "issuer": "https://token.actions.githubusercontent.com",
+          "subject": "repo:contoso-5544123/infra-live-821093861:environment:prod", "audiences": ["api://AzureADTokenExchange"] }
+      ]
+    }
+  ],
+  "managedIdentities": [
+    {
+      "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-platform/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-aks-deployer",
+      "name": "id-aks-deployer",
+      "federatedIdentityCredentials": [
+        { "id": "fic-mi-0001", "name": "platform-aks-prod",
+          "properties": { "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:contoso/platform-aks:environment:production", "audiences": ["api://AzureADTokenExchange"] } }
+      ]
+    },
+    {
+      "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-orders/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-func-orders",
+      "name": "id-func-orders",
+      "federatedIdentityCredentials": [
+        { "id": "fic-mi-0002", "name": "orders-func-main",
+          "properties": { "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:contoso@5544123/orders-func@821093870:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"] } }
+      ]
+    },
+    {
+      "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-batch/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-old-batch",
+      "name": "id-old-batch",
+      "federatedIdentityCredentials": [
+        { "id": "fic-mi-0003", "name": "batch-jobs-main",
+          "properties": { "issuer": "https://token.actions.githubusercontent.com", "subject": "repo:contoso/batch-jobs:ref:refs/heads/main", "audiences": ["api://AzureADTokenExchange"] } }
+      ]
+    }
+  ],
+  "aws": {
+    "accountId": "111122223333",
+    "roles": [
+      { "RoleName": "GitHubActions-Deploy-Prod", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-Deploy-Prod",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+                         "StringLike": { "token.actions.githubusercontent.com:sub": "repo:contoso/payments-api:*" } } } ] } },
+      { "RoleName": "GitHubActions-ReadOnly", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-ReadOnly",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" } } } ] } },
+      { "RoleName": "GitHubActions-Org-Builds", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-Org-Builds",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+                         "StringLike": { "token.actions.githubusercontent.com:sub": "repo:contoso/*" } } } ] } },
+      { "RoleName": "GitHubActions-Artifacts", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-Artifacts",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
+                                           "token.actions.githubusercontent.com:sub": "repo:contoso@5544123/artifacts@821093880:ref:refs/heads/main" } } } ] } },
+      { "RoleName": "GitHubActions-PR-Checks", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-PR-Checks",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:sub": "repo:contoso/web-frontend:pull_request" } } } ] } },
+      { "RoleName": "GitHubActions-Sandbox", "Arn": "arn:aws:iam::111122223333:role/GitHubActions-Sandbox",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRoleWithWebIdentity",
+          "Principal": { "Federated": "arn:aws:iam::111122223333:oidc-provider/token.actions.githubusercontent.com" },
+          "Condition": { "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
+                         "StringLike": { "token.actions.githubusercontent.com:sub": "repo:*/*" } } } ] } },
+      { "RoleName": "EC2-App-Role", "Arn": "arn:aws:iam::111122223333:role/EC2-App-Role",
+        "AssumeRolePolicyDocument": { "Version": "2012-10-17", "Statement": [ {
+          "Effect": "Allow", "Action": "sts:AssumeRole", "Principal": { "Service": "ec2.amazonaws.com" } } ] } }
+    ]
+  },
+  "github": {
+    "contoso/payments-api":    { "Status": "Found", "FullName": "contoso/payments-api", "RepoId": "821093847", "OwnerId": "5544123", "Note": null },
+    "contoso/web-frontend":    { "Status": "Found", "FullName": "contoso/web-frontend", "RepoId": "821093850", "OwnerId": "5544123", "Note": null },
+    "id:821093850":            { "Status": "Found", "FullName": "contoso/web-frontend", "RepoId": "821093850", "OwnerId": "5544123", "Note": null },
+    "contoso/reporting-old":   { "Status": "Renamed", "FullName": "contoso/reporting", "RepoId": "821093855", "OwnerId": "5544123", "Note": null },
+    "fabrikam-tools/sync-agent": { "Status": "OwnerMissing", "FullName": null, "RepoId": null, "OwnerId": null, "Note": "Owner account not found" },
+    "owner:contoso":           "5544123",
+    "contoso/platform-aks":    { "Status": "Found", "FullName": "contoso/platform-aks", "RepoId": "821093866", "OwnerId": "5544123", "Note": null },
+    "id:821093870":            { "Status": "Found", "FullName": "contoso/orders-func", "RepoId": "821093870", "OwnerId": "5544123", "Note": null },
+    "contoso/batch-jobs":      { "Status": "RepoMissing", "FullName": null, "RepoId": null, "OwnerId": "5544123", "Note": "Repository not found" },
+    "id:821093880":            { "Status": "Found", "FullName": "contoso/artifacts", "RepoId": "821093880", "OwnerId": "5544123", "Note": null }
+  }
+}
